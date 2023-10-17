@@ -18,12 +18,32 @@ function RemoveADGroup {
     Remove-ADGroup -Identity $name -Confirm:$False    
 }
 
+function RemoveADUser {
+    param (
+        [Parameter(Mandatory=$true)] $userObject
+    )
+
+    $name = $userObject.name
+    $firstname, $lastname = $name.split(" ")
+    $samAccountName = $username 
+    Remove-ADUser -Identity $samAccountName -Confirm:$False    
+}
+
 function WeakenPasswordPolicy() {
     secedit /export /cfg c:\Windows\Tasks\secpol.cfg
-    (Get-Content c:\Windows\Tasks\secpol.cfg).replace("PasswordComplexity = 1", "PasswordComplexity = 0") | Out-File c:\Windows\Tasks\secpol.cfg
+    (Get-Content c:\Windows\Tasks\secpol.cfg).replace("PasswordComplexity = 1", "PasswordComplexity = 0").replace("MinimumPasswordLength = 7", "MinimumPasswordLength = 1") | Out-File c:\Windows\Tasks\secpol.cfg
     secedit /configure /db c:\windows\security\local.sdb /cfg c:\Windows\Tasks\secpol.cfg /areas SECURITYPOLICY
     rm -force c:\Windows\Tasks\secpol.cfg -confirm:$false    
 }
+
+function StrengthenPasswordPolicy() {
+    secedit /export /cfg c:\Windows\Tasks\secpol.cfg
+    (Get-Content c:\Windows\Tasks\secpol.cfg).replace("PasswordComplexity = 0", "PasswordComplexity = 1").replace("MinimumPasswordLength = 1", "MinimumPasswordLength = 7") | Out-File c:\Windows\Tasks\secpol.cfg
+    secedit /configure /db c:\windows\security\local.sdb /cfg c:\Windows\Tasks\secpol.cfg /areas SECURITYPOLICY
+    rm -force c:\Windows\Tasks\secpol.cfg -confirm:$false    
+}
+
+
 function CreateADUser(){
     param( [Parameter(Mandatory=$true)] $userObject)
     
@@ -67,30 +87,3 @@ foreach ( $user in $json.users) {
     CreateADUser $user
 }
 
-# function CreateADUser() {
-#     param([Parameter(Mandatory=$true)] $userObject)
-
-#     # Pull out the name form the JSON object
-#     $name = $userObject.name
-#     $password = $userObject.password
-
-#     # Generate a "first initial, last name" structure for the username
-#     $firstname, $lastname = $name.Split(" ")
-#     $username = ($firstname[0] + $lastname).ToLower()
-#     $samAccountName = $username
-#     $principalName = $username
-
-#     # Check if each group exists and create it if it doesn't
-#     foreach ($group_name in $userObject.groups) {
-#         if (-not (Get-ADGroup -Filter {Name -eq $group_name})) {
-#             # Group doesn't exist, so create it
-#             New-ADGroup -Name $group_name -GroupScope Global
-#         }
-
-#         # Add the user to the group
-#         Add-ADGroupMember -Identity $group_name -Members $username
-#     }
-
-#     # Actually create the AD user object
-#     New-ADUser -Name "$name" -GivenName $firstname -Surname $lastname -SamAccountName $samAccountName -UserPrincipalName $principalName@$Global:Domain -AccountPassword (ConvertTo-SecureString $password -AsPlainText -Force) -PassThru | Enable-ADAccount
-# }
