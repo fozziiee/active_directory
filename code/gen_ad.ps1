@@ -1,21 +1,37 @@
-param( [Parameter(Mandatory=$true)] $JSONFile)
+param( 
+    [Parameter(Mandatory=$true)] $JSONFile,
+    [switch]$undo)
 
 function CreateADGroup {
     param (
         [Parameter(Mandatory=$true)] $group_nameObject
     )
 
-    $name = $group_nameObject.name
-    New-ADGroup -name $name -GroupScope Global    
+    $group_name = $group_nameObject.name.value
+    New-ADGroup -Name $group_name -GroupScope Global    
 }
+
+function CreateADGroup {
+    param (
+        [Parameter(Mandatory=$true)] $group_nameObject
+    )
+
+    $group_name = $json.group.name.value
+    New-ADGroup -Name $group_name -GroupScope Global    
+}
+
 
 function RemoveADGroup {
     param (
         [Parameter(Mandatory=$true)] $group_nameObject
     )
+    $group_name = $group_nameObject
 
-    $name = $group_nameObject.name
-    Remove-ADGroup -Identity $name -Confirm:$False    
+    if (Get-ADGroup -Filter {Name -eq $group_name}) {
+        Remove-ADGroup -Identity $group_name -Confirm:$False    
+    } else {
+        Write-Host "Group $group_name not found. Skipping removal"
+    }
 }
 
 function RemoveADUser {
@@ -25,6 +41,7 @@ function RemoveADUser {
 
     $name = $userObject.name
     $firstname, $lastname = $name.split(" ")
+    $username = ($firstname[0] + $lastname).ToLower()
     $samAccountName = $username 
     Remove-ADUser -Identity $samAccountName -Confirm:$False    
 }
@@ -56,9 +73,12 @@ function CreateADUser(){
     $username = ($firstname[0] + $lastname).ToLower()
     $samAccountName = $username
     $principalName = $username
+
+    # Extract group names from the userObject
+    $groupNames = $userObject.groups | ForEach-Object { $_.name.value }
     
     # Check if each group exists and create it if it doesn't
-    foreach ($group_name in $userObject.groups) {
+    foreach ($group_name in $groupNames) {
         if (-not (Get-ADGroup -Filter {Name -eq $group_name})) {
             # Group doesn't exist, so create it
             New-ADGroup -Name $group_name -GroupScope Global
@@ -74,16 +94,36 @@ function CreateADUser(){
 }
 
 
-WeakenPasswordPolicy
-
 $json = ( Get-Content $JSONFile | ConvertFrom-Json)
 $Global:Domain = $json.domain
 
-foreach($group_name in $json.groups ) {
-    CreateADGroup $group_name
+if ( -not $undo ) {
+    
+    WeakenPasswordPolicy
+    foreach($group in $group_nameObject.name.value ) {
+        # Extract the group name from the group Object
+        $groupName = $group
+        CreateADGroup $groupName
+    }
+    
+    foreach ( $user in $json.users) {
+        CreateADUser $user
+    }
+} else {
+    StrengthenPasswordPolicy
+    
+    foreach ( $user in $json.users) {
+        RemoveADUser $user
+    }
+    foreach ( $group in $group_nameObject.name.value ){
+        # Extract the group name from the group object
+        $groupName = $group
+        Write-Debug "Removing group: $groupName"
+        RemoveADGroup $groupName
+    }
+
 }
 
-foreach ( $user in $json.users) {
-    CreateADUser $user
-}
+
+
 
