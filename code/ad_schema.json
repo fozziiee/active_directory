@@ -26,5 +26,16 @@
                 "Employees"
             ]
         }
+    ],
+
+    "local_admins" : [
+
+
+        {
+            "local_admin":  true,
+            "groups":  "",
+            "name":  "",
+            "password":  ""
+        }
     ]
 }

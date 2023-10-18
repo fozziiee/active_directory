@@ -90,7 +90,9 @@ function CreateADUser(){
     # Actually create the AD user object
     New-ADUser -Name "$name" -GivenName $firstname -Surname $lastname -SamAccountName $samAccountName -UserPrincipalName $principalName@$Global:Domain -AccountPassword (ConvertTo-SecureString $password -AsPlainText -Force) -PassThru | Enable-ADAccount
 
-
+    if ( $userObject.local_admin -eq $true ){
+        net localgroup administrators $Global:Domain\$username /add
+    }
 }
 
 
